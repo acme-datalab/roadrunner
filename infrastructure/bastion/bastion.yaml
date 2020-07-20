@@ -1,0 +1,43 @@
+- hosts: all
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    etckeeper_vcs: git
+  become: yes
+  roles:
+    - role: mrlesmithjr.netplan
+      become: yes
+      # This role will do nothing unless netplan_enabled is true.
+      netplan_enabled: true
+      # The default is /etc/netplan/config.yaml.
+      netplan_config_file: /etc/netplan/jebac_netplan.yaml
+      # Ubuntu 18.04, for example, defaults to using networkd.
+      netplan_renderer: networkd
+      # Simple network configuration to add a single network
+      # interface.
+      netplan_configuration:
+        network:
+          version: 2
+          ethernets:
+            enp0s31f6:
+              dhcp4: true
+  tasks:
+  - name: Update apt-get repo and cache
+    apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+  - name: Install etckeeper
+    apt: name=etckeeper state=latest
+  - name: Install git
+    apt: name=git state=latest
+  - name: Initialize the etckeeper
+    command:
+      cmd: etckeeper init 
+      chdir: /etc
+  - name: Set etckeeper to push each commit to remote branch[etckeeper_remote]
+    lineinfile:
+      path: /etc/etckeeper/etckeeper.conf
+      regexp: '^PUSH_REMOTE='
+      line: PUSH_REMOTE="etckeeper_remote"
+  - name: Set authorized key for user elf taken from file
+    authorized_key:
+      user: elf
+      state: present
+      key: "{{ lookup('file', '/home/elf/.ssh/id_rsa.pub') }}"
